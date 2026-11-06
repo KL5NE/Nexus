@@ -73,6 +73,29 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Clippy (baseline with one documented upstream warning)
         run: cargo clippy --workspace --all-targets -- -D warnings -A clippy::unnecessary_sort_by
+      - name: Diagnose generated MinGW Makefiles after native failure
+        if: failure()
+        shell: pwsh
+        run: |
+          $buildDirs = Get-ChildItem 'target/debug/build' -Directory -Filter 'tempo-fast-sys-*' -ErrorAction SilentlyContinue
+          foreach ($dir in $buildDirs) {
+            $out = Join-Path $dir.FullName 'out'
+            $cache = Join-Path $out 'CMakeCache.txt'
+            $makefile = Join-Path $out 'CMakeFiles/tempo_static.dir/build.make'
+            if (Test-Path $cache) {
+              Write-Output "=== CMake generator and source directory ($cache) ==="
+              Select-String -Path $cache -Pattern '^CMAKE_GENERATOR:','^CMAKE_HOME_DIRECTORY:','^CMAKE_MAKE_PROGRAM:' | ForEach-Object { $_.Line }
+            }
+            if (Test-Path $makefile) {
+              Write-Output "=== Generated build.make lines 65-90 ($makefile) ==="
+              $lines = Get-Content $makefile
+              for ($i=64; $i -lt [Math]::Min(90,$lines.Count); $i++) {
+                Write-Output ("{0}: {1}" -f ($i+1), $lines[$i])
+              }
+              Write-Output "=== Relevant path tokens ==="
+              Select-String -Path $makefile -Pattern '\\\\?\\','//?/','tempodeep','^D:' | Select-Object -First 12 | ForEach-Object { $_.Line }
+            }
+          }
       - name: Rust workspace tests
         run: cargo test --workspace
       - name: End and instructions
