@@ -21,6 +21,7 @@ jobs:
           update: true
           install: >-
             mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-gcc-fortran
             mingw-w64-x86_64-pkgconf
             mingw-w64-x86_64-fftw
             mingw-w64-x86_64-boost
@@ -87,9 +88,9 @@ jobs:
         working-directory: ui
         shell: pwsh
         run: |
-          Write-Output "Upstream v1.22.0 package-lock.json is out of sync. Regenerating only in this disposable CI workspace."
+          Write-Output "Upstream v1.22.0 package-lock.json is out of sync. Regenerating only in this disposable CI workspace with legacy peer handling."
           Remove-Item package-lock.json -Force
-          npm install --no-audit --no-fund
+          npm install --legacy-peer-deps --no-audit --no-fund
           if ($LASTEXITCODE -ne 0) { throw "UI dependency installation failed" }
           Write-Output "This establishes a diagnostic UI baseline only; lockfile reproducibility remains unresolved."
       - name: TypeScript check
