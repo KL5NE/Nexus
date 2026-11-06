@@ -156,3 +156,23 @@ jobs:
         working-directory: ui
         timeout-minutes: 8
         run: npx vitest run src/components/Logbook.qslMark.test.tsx --reporter=dot
+
+  cross-modem-linux:
+    name: Supported Windows GNU cross-build / modem only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install documented Windows cross-toolchain prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 gfortran-mingw-w64-x86-64 cmake ninja-build nasm pkg-config
+      - name: Install Rust Windows GNU target
+        run: rustup target add x86_64-pc-windows-gnu
+      - name: Run repository-supported modem-only cross-build (no installer or deployment)
+        run: bash scripts/build-windows-cross.sh --modem
+      - name: Report produced Windows modem binaries
+        run: |
+          test -s target/x86_64-pc-windows-gnu/release/examples/win_smoke.exe
+          ls -lh target/x86_64-pc-windows-gnu/release/examples/win_smoke.exe
+          find libtempo/build-win -maxdepth 1 -name '*.exe' -printf '%f %s bytes\n'
