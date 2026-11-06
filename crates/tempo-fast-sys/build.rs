@@ -60,11 +60,18 @@ fn main() {
     // Build from an MSYS2/MinGW environment with the GNU Rust target
     // (x86_64-pc-windows-gnu). See WINDOWS.md.
     if cfg!(windows) {
-        if which("ninja") {
-            cfg.args(["-G", "Ninja"]);
-        } else {
-            cfg.args(["-G", "MinGW Makefiles"]);
-        }
+        // Respect the CI-selected generator when diagnosing Windows/MinGW
+        // Fortran source-path handling. An explicit -G otherwise overrides
+        // CMAKE_GENERATOR and silently defeats the workflow selection.
+        let generator = env::var("CMAKE_GENERATOR").unwrap_or_else(|_| {
+            if which("ninja") {
+                "Ninja".to_owned()
+            } else {
+                "MinGW Makefiles".to_owned()
+            }
+        });
+        cfg.args(["-G", &generator]);
+        println!("cargo:rerun-if-env-changed=CMAKE_GENERATOR");
     }
     run(&mut cfg);
 
