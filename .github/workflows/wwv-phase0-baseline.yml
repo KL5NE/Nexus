@@ -1,0 +1,54 @@
+name: WWV Phase 0 baseline (unmodified Nexus)
+on:
+  push:
+    branches:
+      - feature/wwv-time-tab
+    paths:
+      - 'docs/wwv/**'
+      - '.github/workflows/wwv-phase0-baseline.yml'
+  workflow_dispatch:
+jobs:
+  baseline:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Record versions and start
+        shell: pwsh
+        run: |
+          Get-Date -Format o
+          rustc --version
+          cargo --version
+          node --version
+          npm --version
+      - name: Rust formatting (baseline)
+        run: cargo fmt --all -- --check
+      - name: Rust clippy (baseline)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Rust workspace tests (baseline)
+        run: cargo test --workspace
+      - name: UI install
+        working-directory: ui
+        run: npm ci
+      - name: UI TypeScript check
+        working-directory: ui
+        run: npx tsc -b
+      - name: UI Vitest
+        working-directory: ui
+        run: npx vitest run
+      - name: Record end
+        if: always()
+        shell: pwsh
+        run: |
+          Get-Date -Format o
+          Write-Output "This workflow is checks-only, NOT a validated Windows installer build or HAMBEAST smoke test."
