@@ -166,7 +166,7 @@ jobs:
       - name: Install documented Windows cross-toolchain prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 gfortran-mingw-w64-x86-64 cmake ninja-build nasm pkg-config
+          sudo apt-get install -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 gfortran-mingw-w64-x86-64 cmake ninja-build nasm pkg-config libboost-dev
       - name: Install Rust Windows GNU target
         run: rustup target add x86_64-pc-windows-gnu
       - name: Run repository-supported modem-only cross-build (no installer or deployment)
