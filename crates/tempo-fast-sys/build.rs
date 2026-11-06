@@ -27,10 +27,20 @@ mod manifest_gate;
 
 fn main() {
     let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let libtempo_src = manifest
+    let canonical_src = manifest
         .join("../../libtempo")
         .canonicalize()
         .expect("locate tempo/libtempo");
+    // Windows canonicalize() yields a verbatim \\?\\ path. CMake writes that
+    // prefix into generated Makefile prerequisites as //?/D:/..., which GNU
+    // make parses as a malformed target and gfortran cannot open. Keep the
+    // canonical absolute path, but use ordinary drive-letter syntax for CMake.
+    let libtempo_src = if cfg!(windows) {
+        let canonical = canonical_src.to_string_lossy();
+        PathBuf::from(canonical.strip_prefix(r"\\?\").unwrap_or(&canonical))
+    } else {
+        canonical_src
+    };
     check_state_manifest(&libtempo_src);
     let out = PathBuf::from(env::var("OUT_DIR").unwrap());
 
