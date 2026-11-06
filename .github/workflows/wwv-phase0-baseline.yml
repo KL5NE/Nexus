@@ -37,6 +37,14 @@ jobs:
           $bin | Out-File -FilePath $env:GITHUB_PATH -Append
           "MINGW_ROOT=$mingw" | Out-File -FilePath $env:GITHUB_ENV -Append
           Get-Date -Format o
+      - name: Prefer MinGW Makefiles for native Fortran build
+        shell: pwsh
+        run: |
+          $make = Join-Path (Join-Path $env:MINGW_ROOT 'bin') 'mingw32-make.exe'
+          if (-not (Test-Path $make)) { throw "MinGW make missing: $make" }
+          "CMAKE_GENERATOR=MinGW Makefiles" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "CMAKE_MAKE_PROGRAM=$make" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Output "Use MinGW Makefiles to avoid Ninja Fortran preprocessing paths (//?/D:/...) seen in prior CI."
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
