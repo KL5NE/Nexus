@@ -73,8 +73,11 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Isolated native libtempo compile check
         run: cargo check -p tempo-fast-sys
-      - name: Isolated native libtempo unit tests (independent of libvpx)
-        run: cargo test -p tempo-fast-sys
+      # MSVC's link.exe cannot consume MinGW libgfortran (-lgfortran resolves
+      # to gfortran.lib). Compile test targets without linking until the supported
+      # Windows GNU target or cross-build is provisioned for runtime tests.
+      - name: Isolated native libtempo test-target compilation (no MSVC link)
+        run: cargo check -p tempo-fast-sys --tests
       - name: Windows workspace dependency preflight (pinned libvpx)
         shell: pwsh
         run: |
