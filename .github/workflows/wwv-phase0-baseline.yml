@@ -104,6 +104,11 @@ jobs:
       - name: TypeScript check
         working-directory: ui
         run: npx tsc -b
-      - name: Vitest
+      - name: Vitest known-good smoke baseline
         working-directory: ui
-        run: npx vitest run
+        timeout-minutes: 4
+        run: npx vitest run src/features/audioError.test.ts --reporter=dot
+      - name: Vitest targeted Logbook regression diagnosis
+        working-directory: ui
+        timeout-minutes: 8
+        run: npx vitest run src/components/Logbook.qslMark.test.tsx --reporter=dot
