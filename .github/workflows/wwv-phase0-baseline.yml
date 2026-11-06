@@ -1,54 +1,78 @@
 name: WWV Phase 0 baseline (unmodified Nexus)
 on:
   push:
-    branches:
-      - feature/wwv-time-tab
+    branches: [feature/wwv-time-tab]
     paths:
       - 'docs/wwv/**'
       - '.github/workflows/wwv-phase0-baseline.yml'
   workflow_dispatch:
 jobs:
-  baseline:
+  rust-windows:
+    name: Rust / Windows baseline
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - name: MSYS2 native Fortran / FFTW / Boost / pkg-config
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-fftw
+            mingw-w64-x86_64-boost
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+      - name: Put native toolchain ahead of runner tools
+        shell: pwsh
+        run: |
+          "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+          Get-Date -Format o
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy,rustfmt
-      - name: Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: ui/package-lock.json
-      - name: Record versions and start
+      - name: Toolchain diagnostics
         shell: pwsh
         run: |
-          Get-Date -Format o
           rustc --version
           cargo --version
-          node --version
-          npm --version
-      - name: Rust formatting (baseline)
+          cmake --version
+          gfortran --version
+          pkg-config --version
+          pkg-config --modversion fftw3f
+      - name: Rust formatting
         run: cargo fmt --all -- --check
-      - name: Rust clippy (baseline)
-        run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Rust workspace tests (baseline)
+      - name: Clippy (baseline with one documented upstream warning)
+        run: cargo clippy --workspace --all-targets -- -D warnings -A clippy::unnecessary_sort_by
+      - name: Rust workspace tests
         run: cargo test --workspace
-      - name: UI install
-        working-directory: ui
-        run: npm ci
-      - name: UI TypeScript check
-        working-directory: ui
-        run: npx tsc -b
-      - name: UI Vitest
-        working-directory: ui
-        run: npx vitest run
-      - name: Record end
+      - name: End and instructions
         if: always()
         shell: pwsh
         run: |
           Get-Date -Format o
-          Write-Output "This workflow is checks-only, NOT a validated Windows installer build or HAMBEAST smoke test."
+          Write-Output "Baseline-only checks: no WWV integration, installer, or HAMBEAST runtime test."
+
+  ui-windows:
+    name: UI / Windows baseline
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install UI dependencies
+        working-directory: ui
+        run: npm ci
+      - name: TypeScript check
+        working-directory: ui
+        run: npx tsc -b
+      - name: Vitest
+        working-directory: ui
+        run: npx vitest run
