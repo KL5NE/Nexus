@@ -71,6 +71,8 @@ jobs:
           & (Join-Path $bin 'gfortran.exe') --version
       - name: Rust formatting
         run: cargo fmt --all -- --check
+      - name: Native Windows workspace compile baseline (independent of upstream Clippy lints)
+        run: cargo check --workspace --all-targets
       - name: Clippy (baseline with one documented upstream warning)
         run: cargo clippy --workspace --all-targets -- -D warnings -A clippy::unnecessary_sort_by
       - name: Diagnose generated MinGW Makefiles after native failure
