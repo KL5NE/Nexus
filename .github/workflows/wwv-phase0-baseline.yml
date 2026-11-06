@@ -73,6 +73,8 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Isolated native libtempo compile check
         run: cargo check -p tempo-fast-sys
+      - name: Isolated native libtempo unit tests (independent of libvpx)
+        run: cargo test -p tempo-fast-sys
       - name: Windows workspace dependency preflight (pinned libvpx)
         shell: pwsh
         run: |
