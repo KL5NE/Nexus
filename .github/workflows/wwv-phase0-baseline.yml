@@ -5,6 +5,7 @@ on:
     paths:
       - 'docs/wwv/**'
       - '.github/workflows/wwv-phase0-baseline.yml'
+      - 'crates/tempo-fast-sys/build.rs'
   workflow_dispatch:
 jobs:
   rust-windows:
