@@ -71,6 +71,19 @@ jobs:
           & (Join-Path $bin 'gfortran.exe') --version
       - name: Rust formatting
         run: cargo fmt --all -- --check
+      - name: Isolated native libtempo compile check
+        run: cargo check -p tempo-fast-sys
+      - name: Windows workspace dependency preflight (pinned libvpx)
+        shell: pwsh
+        run: |
+          $prefix = if ($env:VPX_MINGW_PREFIX) { $env:VPX_MINGW_PREFIX } else { Join-Path $env:GITHUB_WORKSPACE 'target/vpx-mingw' }
+          $archive = Join-Path $prefix 'lib/libvpx.a'
+          $headers = Join-Path $prefix 'include/vpx'
+          if (-not ((Test-Path $archive) -and (Test-Path $headers))) {
+            Write-Warning "Full workspace compilation requires pinned static libvpx. Missing $archive or $headers. The supported cross-build script is scripts/build-windows-cross.sh; this native CI runner has not provisioned that dependency."
+          } else {
+            Write-Output "Pinned libvpx available at $prefix"
+          }
       - name: Native Windows workspace compile baseline (independent of upstream Clippy lints)
         run: cargo check --workspace --all-targets
       - name: Clippy (baseline with one documented upstream warning)
