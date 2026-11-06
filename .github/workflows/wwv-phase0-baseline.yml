@@ -14,6 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: MSYS2 native Fortran / FFTW / Boost / pkg-config
+        id: msys2
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
@@ -25,10 +26,15 @@ jobs:
             mingw-w64-x86_64-boost
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-ninja
-      - name: Put native toolchain ahead of runner tools
+      - name: Use actual MSYS2 installation path
         shell: pwsh
         run: |
-          "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+          $msysRoot = '${{ steps.msys2.outputs.msys2-location }}'
+          $mingw = Join-Path $msysRoot 'mingw64'
+          $bin = Join-Path $mingw 'bin'
+          if (-not (Test-Path $bin)) { throw "MSYS2 bin missing: $bin" }
+          $bin | Out-File -FilePath $env:GITHUB_PATH -Append
+          "MINGW_ROOT=$mingw" | Out-File -FilePath $env:GITHUB_ENV -Append
           Get-Date -Format o
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -39,19 +45,20 @@ jobs:
         run: |
           rustc --version
           cargo --version
-          cmake --version
-          gfortran --version
-          # Windows image has Strawberry Perl's pkg-config earlier on PATH.
-          # MSYS2's library metadata must be selected explicitly.
-          $env:PKG_CONFIG = "C:\msys64\mingw64\bin\pkg-config.exe"
-          $env:PKG_CONFIG_LIBDIR = "C:\msys64\mingw64\lib\pkgconfig"
-          $env:PKG_CONFIG_PATH = "C:\msys64\mingw64\lib\pkgconfig"
-          "PKG_CONFIG=$env:PKG_CONFIG" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "PKG_CONFIG_LIBDIR=$env:PKG_CONFIG_LIBDIR" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "PKG_CONFIG_PATH=$env:PKG_CONFIG_PATH" | Out-File -FilePath $env:GITHUB_ENV -Append
-          & $env:PKG_CONFIG --version
-          Get-ChildItem "C:\msys64\mingw64\lib\pkgconfig" -Filter "*fftw*"
-          & $env:PKG_CONFIG --modversion fftw3f
+          $bin = Join-Path $env:MINGW_ROOT 'bin'
+          $pc = Join-Path $bin 'pkgconf.exe'
+          if (-not (Test-Path $pc)) { $pc = Join-Path $bin 'pkg-config.exe' }
+          if (-not (Test-Path $pc)) { throw "MSYS2 pkg-config binary missing in $bin" }
+          $libpc = Join-Path (Join-Path $env:MINGW_ROOT 'lib') 'pkgconfig'
+          if (-not (Test-Path (Join-Path $libpc 'fftw3f.pc'))) { throw "MSYS2 FFTW3f .pc file missing in $libpc" }
+          $env:PKG_CONFIG = $pc
+          $env:PKG_CONFIG_LIBDIR = $libpc
+          $env:PKG_CONFIG_PATH = $libpc
+          "PKG_CONFIG=$pc" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "PKG_CONFIG_LIBDIR=$libpc" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "PKG_CONFIG_PATH=$libpc" | Out-File -FilePath $env:GITHUB_ENV -Append
+          & $pc --modversion fftw3f
+          & (Join-Path $bin 'gfortran.exe') --version
       - name: Rust formatting
         run: cargo fmt --all -- --check
       - name: Clippy (baseline with one documented upstream warning)
@@ -76,22 +83,15 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: ui/package-lock.json
-      - name: Diagnose upstream lockfile mismatch
+      - name: UI baseline install (temporary lockfile regeneration)
         working-directory: ui
         shell: pwsh
         run: |
-          # npm ci is known to fail against v1.22.0's lockfile.
-          # Keep the check informational, without swallowing unrelated failures.
-          $p = Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", "npm ci > ci-baseline.log 2>&1") -NoNewWindow -Wait -PassThru
-          if ($p.ExitCode -ne 0) {
-            Write-Output "Baseline observation: npm ci failed, likely upstream lockfile mismatch."
-            Get-Content ci-baseline.log | Select-String "npm error (Missing|Invalid|code)" | Select-Object -First 12
-          } else {
-            Write-Output "Baseline npm ci succeeded."
-          }
-      - name: Install UI dependencies without modifying lockfile
-        working-directory: ui
-        run: npm install --no-save --package-lock=false --no-audit --no-fund
+          Write-Output "Upstream v1.22.0 package-lock.json is out of sync. Regenerating only in this disposable CI workspace."
+          Remove-Item package-lock.json -Force
+          npm install --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { throw "UI dependency installation failed" }
+          Write-Output "This establishes a diagnostic UI baseline only; lockfile reproducibility remains unresolved."
       - name: TypeScript check
         working-directory: ui
         run: npx tsc -b
