@@ -1,31 +1,38 @@
-# CI Autopilot — staged, owner approval required
+# CI Health Reporting — no paid AI, no secrets
 
-This folder documents the draft fail-closed unattended CI workflow. **This is not active until the workflows are merged to the default branch with Sean's approval**. Creating a PR does not activate a workflow_run handler.
+This branch replaces the proposed Claude API repair action with GitHub-native diagnostics and keeps all existing build and safety gates unchanged.
 
-The existing build workflows are unchanged; they remain responsible for their own real build/test gates. **This draft does not yet satisfy the requested single end-to-end build → test → package pipeline.**
+## What it does
 
-## Safeguards
-- Only failures from owner-pushed workflows on owned branches are eligible for Claude repair. Fork PR, main, protected branches, CI-fix branches and arbitrary actors are excluded.
-- No merges, tags, releases, deployment to HAMBEAST, system-clock changes, secret changes or upstream PRs.
-- One issue per workflow and branch, with a maximum of two dispatches recorded in the issue body. Failures beyond limit receive the `needs-sean` label.
-- Repair requests are dispatched via GitHub repository_dispatch, which GitHub allows to trigger a new workflow when created using GITHUB_TOKEN; the Claude Code action supports repository_dispatch. Never check out code from untrusted fork PRs in this privileged handler.
-- No `ANTHROPIC_API_KEY` means no Claude fix attempts. Add the key individually to each repository through Settings → Secrets and variables → Actions → New repository secret. Do not paste it into a chat or commit it.
-- A green core-test run is **not** an installable product. Only a successful packaging workflow publishing a verified installer/ZIP can be called ready to download.
-- The final green artifact report depends on release-specific packaging workflows; VM/interactive validation remains distinct.
+- After each listed workflow completes on an owner-controlled push, record each job's status and failed steps.
+- Include workflow run links, artifact names, artifact archive digests (when GitHub provides them), and sizes in an Actions job summary.
+- On an eligible failure, collect a bounded log excerpt, classify a few **known** failure patterns, and create or update an issue named `CI failure: <workflow> on <branch>`.
+- Never execute commands from CI logs or make an automatic code change. The diagnosis is a heuristic; confirm it before acting.
+- One open tracking issue per workflow/branch avoids unnecessary duplicate incident issues. A new failed run updates that issue.
 
-## Verification requirements
-Before enabling for production:
-1. Review workflow permissions and allowlist. Approve the PR into the default branch only when ready.
-2. Add the secret separately to both GitHub repositories.
-3. Push a deliberate, non-safety test failure in an owner-only throwaway branch and verify: CI failure → issue → repository_dispatch → Claude fix PR → green PR test → no merge.
-4. Verify two-attempt limit, no secret leakage, failure on CI-fix branches, label behavior and no release side effects.
+## What it does NOT do
 
-**Status:** draft automation, not a proven autonomous repair loop.
-## Branch protection prerequisite (mandatory)
-The Claude job's GitHub token has `contents: write` to open a repair branch. GitHub Actions cannot scope that permission to `ci-fix/*` alone. **Before activating automatic repair, configure a ruleset protecting `main` and other protected branches from GitHub Actions bot pushes, enforce PR reviews, and disallow bypass by the automation identity.** Prompt text alone is not a technical guarantee.
+- No `ANTHROPIC_API_KEY`, Claude Pro, API subscription, or third-party AI service.
+- No autonomous source repair. There are no approved deterministic repair recipes yet; any such recipes must be added as narrowly scoped, independently tested patches.
+- No automatic merge, tag, release, main push, HAMBEAST install, clock change, or upstream PR.
+- No promise that a passing core test means the Windows installer is ready. The DLL build, packaging, disposable-runner acceptance, and HAMBEAST GUI tests are separate gates.
+- No guaranteed push notification for every green result; GitHub watch and notification settings determine what the user sees.
+- No unified one-run build → test → package → upload pipeline **yet**. That requires separate, explicitly evaluated refactoring of existing build workflows.
+- No test counts or payload-file SHA256 unless the producing workflow reports them. Artifact archive digests, when available, are not equivalent to individual installed DLL checksums.
 
-## Operational limitations
-- `anthropics/claude-code-action@v1` in `repository_dispatch` mode is staged but unverified with this repo; no claimed self-healing demonstration until the key and default-branch workflow are active.
-- Two-attempt counter currently applies per tracking issue across repeated owner-push failures; a separate failed repair PR does not yet automatically schedule the second attempt.
-- The original build workflows have not been consolidated into single build→test→installer chains. We must not label a core-only green run as a downloadable full product.
-- GitHub default notifications cannot be restricted to the three desired categories using workflow files alone; watch/subscription settings or a dedicated notification channel require separate setup.
+## Activation and trust boundary
+
+GitHub Actions `workflow_run` workflows execute from the **default branch**. This draft exists only on `ci/autopilot-20261107` and must **not** be merged into `main` without Sean's approval.
+
+If approved, the diagnostic job runs under a narrowly scoped token with `actions: read`, `contents: read`, `issues: write`. It never checks out source from the run it analyzes. It only creates issues for owner-triggered push failures on development branches.
+
+The live demo requested in the original brief (failure → issue → auto-fix PR → green) is **not fulfilled**, because autonomous AI repair was deliberately removed and no safe deterministic fix recipe has yet been implemented.
+
+## What happens when a run fails
+
+1. Open the issue named `CI failure: ...`.
+2. Follow the linked Actions run to the exact failed step and log.
+3. Review the suggested root-cause pattern and produce a targeted correction on a development branch.
+4. Retest and get owner approval; do not bypass security or acceptance checks.
+
+For future efficiency, standardize a single product-ready workflow for each project and have it generate a release manifest with test counts, file checksums, artifact links, and explicit readiness gates. **This is a next milestone, not a claim of current functionality.**
