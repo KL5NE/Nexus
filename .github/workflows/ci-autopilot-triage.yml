@@ -1,0 +1,81 @@
+
+name: CI diagnostics (no paid AI)
+on:
+  workflow_run:
+    workflows: ["WWV Phase 0 baseline (unmodified Nexus)"]
+    types: [completed]
+permissions:
+  actions: read
+  contents: read
+  issues: write
+jobs:
+  diagnose:
+    if: github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Gather errors as inert text
+        if: github.event.workflow_run.conclusion == 'failure'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ github.event.workflow_run.id }}
+        run: |
+          gh run view "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --log-failed 2>&1 | tail -n 80 | cut -c 1-350 > failed-steps.txt || true
+      - name: Summarize and record actionable errors
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const run = context.payload.workflow_run;
+            const owner = context.repo.owner, repo = context.repo.repo;
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun,
+              {owner,repo,run_id:run.id,per_page:100});
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:run.id,per_page:100});
+            const failed = jobs.filter(j=>j.conclusion === 'failure');
+            const steps = failed.flatMap(j=>(j.steps||[]).filter(s=>s.conclusion==='failure').map(s=>j.name+' / '+s.name));
+            const summary = [
+              '## '+run.name+': '+run.conclusion,
+              '[Workflow run and logs]('+run.html_url+')',
+              'Branch: '+run.head_branch+'; commit: '+run.head_sha,
+              '| Job | Result | Failed step |','|---|---|---|',
+              ...jobs.map(j=>'| '+j.name+' | '+(j.conclusion||j.status)+' | '+(j.steps||[]).filter(s=>s.conclusion==='failure').map(s=>s.name).join(', ')+' |'),
+              '### Published artifacts',
+              ...(artifacts.length ? artifacts.map(a=>'- ['+a.name+']('+run.html_url+'/artifacts/'+a.id+') — '+a.size_in_bytes+' bytes; archive digest '+(a.digest||'unavailable')) : ['None']),
+              'Green means only that this specific workflow passed; it does NOT certify other build, packaging, or interactive safety gates.'
+            ];
+            await core.summary.addRaw(summary.join('\n')).write();
+            if (run.conclusion !== 'failure' || run.event !== 'push' || run.actor.login !== 'KL5NE' ||
+                !/^(feature|installer|test|ci)\//.test(run.head_branch||'') ||
+                /^ci-fix\//.test(run.head_branch||'')) return;
+            const log = fs.existsSync('failed-steps.txt') ? fs.readFileSync('failed-steps.txt','utf8') : '';
+            const excerpt = log.split(/\r?\n/).filter(s=>/error|exception|failed|fatal|timeout|not recognized|exit code/i.test(s))
+              .slice(-22).map(s=>s.slice(0,250)).join('\n').slice(-5400);
+            const rules = [
+              [/Get-FileHash.*not recognized/i, 'PowerShell command availability / installer host checking.'],
+              [/Pinned run.*not verified/i, 'Dependency gate: exact pinned DLL workflow must complete green.'],
+              [/undefined reference|unresolved external|cannot find.*(dll|lib)/i, 'Likely link/toolchain dependency mismatch.'],
+              [/timed out|connection reset|503 Service Unavailable/i, 'Possibly transient infrastructure; review before retrying.']
+            ];
+            const probable = (rules.find(x=>x[0].test(log))||[null,'Unknown: inspect the first failed step.'])[1];
+            const title = 'CI failure: '+run.name+' on '+run.head_branch;
+            const issues = await github.paginate(github.rest.issues.listForRepo,{owner,repo,state:'open',per_page:100});
+            const old = issues.find(x=>!x.pull_request && x.title===title);
+            const body = [
+              'Automated **diagnostics only**; no AI API, autonomous source changes, or test bypass.',
+              'Run: '+run.html_url,
+              'Commit: '+run.head_sha,
+              'Failed steps: '+(steps.join('; ')||'See logs'),
+              'Possible cause (heuristic, not verified): '+probable,
+              'Error excerpt (untrusted text):',
+              '~~~text', excerpt||'No matching error lines; inspect full logs.', '~~~',
+              'Next action: inspect and fix on a development branch; preserve all test and safety gates.'
+            ].join('\n\n');
+            if(old) {
+              await github.rest.issues.update({owner,repo,issue_number:old.number,body});
+              core.notice('Updated issue #'+old.number);
+            } else {
+              const created=await github.rest.issues.create({owner,repo,title,body});
+              core.notice('Opened issue #'+created.data.number);
+            }
