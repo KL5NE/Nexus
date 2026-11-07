@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Summarize result and track failure
         uses: actions/github-script@v7
+        env:
+          HAS_CLAUDE_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
         with:
           script: |
             const run = context.payload.workflow_run;
@@ -38,9 +40,25 @@ jobs:
             const all = await github.paginate(github.rest.issues.listForRepo,{owner,repo,state:'all',per_page:100});
             const prior = all.find(i => !i.pull_request && i.title === title);
             const count = prior ? Number(((prior.body||'').match(/autopilot-attempts:([0-9]+)/)||[])[1] || 0) : 0;
+            const noKey = process.env.HAS_CLAUDE_KEY !== 'true';
+            const exhausted = count >= 2;
+            const attempt = (exhausted || noKey) ? count : count + 1;
             const failures = jobs.filter(j=>j.conclusion==='failure').map(j=>j.name+': '+(j.steps||[]).filter(s=>s.conclusion==='failure').map(s=>s.name).join(', '));
-            const body = 'Failure run: '+run.html_url+'\n\nFailed steps: '+failures.join('; ')+'\n\nLikely cause: consult first failed step logs.\n\nautopilot-attempts:'+count;
+            const body = 'Failure run: '+run.html_url+'\n\nFailed steps: '+failures.join('; ')+
+              '\n\nLikely cause: consult the first failed step logs, not the final exit code.'+
+              '\n\nAttempt cap: 2.\n\nautopilot-attempts:'+attempt;
             const issue = prior
               ? (await github.rest.issues.update({owner,repo,issue_number:prior.number,state:'open',body})).data
               : (await github.rest.issues.create({owner,repo,title,body})).data;
-            core.notice('Tracking issue #'+issue.number+'; repair requires key and separately approved workflow.');
+            if (noKey || exhausted) {
+              try { await github.rest.issues.getLabel({owner,repo,name:'needs-sean'}); }
+              catch (_) { await github.rest.issues.createLabel({owner,repo,name:'needs-sean',color:'c23b22'}); }
+              await github.rest.issues.addLabels({owner,repo,issue_number:issue.number,labels:['needs-sean']});
+              core.notice(noKey ? 'Claude API key missing: needs Sean.' : 'Two attempts exhausted: needs Sean.');
+            } else {
+              await github.rest.repos.createDispatchEvent({
+                owner,repo,event_type:'ahr_ci_auto_fix',
+                client_payload:{run_id:run.id,issue:issue.number,branch:run.head_branch,attempt}
+              });
+              core.notice('Dispatched Claude repair attempt '+attempt+' to issue #'+issue.number);
+            }
