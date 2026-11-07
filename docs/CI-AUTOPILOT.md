@@ -21,3 +21,11 @@ Before enabling for production:
 4. Verify two-attempt limit, no secret leakage, failure on CI-fix branches, label behavior and no release side effects.
 
 **Status:** draft automation, not a proven autonomous repair loop.
+## Branch protection prerequisite (mandatory)
+The Claude job's GitHub token has `contents: write` to open a repair branch. GitHub Actions cannot scope that permission to `ci-fix/*` alone. **Before activating automatic repair, configure a ruleset protecting `main` and other protected branches from GitHub Actions bot pushes, enforce PR reviews, and disallow bypass by the automation identity.** Prompt text alone is not a technical guarantee.
+
+## Operational limitations
+- `anthropics/claude-code-action@v1` in `repository_dispatch` mode is staged but unverified with this repo; no claimed self-healing demonstration until the key and default-branch workflow are active.
+- Two-attempt counter currently applies per tracking issue across repeated owner-push failures; a separate failed repair PR does not yet automatically schedule the second attempt.
+- The original build workflows have not been consolidated into single build→test→installer chains. We must not label a core-only green run as a downloadable full product.
+- GitHub default notifications cannot be restricted to the three desired categories using workflow files alone; watch/subscription settings or a dedicated notification channel require separate setup.
