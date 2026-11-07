@@ -18,6 +18,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "ahr-wwv-sys"
+version = "0.1.0"
+
+[[package]]
 name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3973,6 +3977,13 @@ name = "wspr"
 version = "0.1.0"
 dependencies = [
  "tempo-fast-sys",
+]
+
+[[package]]
+name = "wwv"
+version = "0.1.0"
+dependencies = [
+ "ahr-wwv-sys",
 ]
 
 [[package]]
