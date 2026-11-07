@@ -1,0 +1,46 @@
+name: CI autopilot diagnostics
+on:
+  workflow_run:
+    workflows: ["WWV Phase 0 baseline (unmodified Nexus)"]
+    types: [completed]
+permissions:
+  actions: read
+  contents: read
+  issues: write
+jobs:
+  report:
+    if: github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summarize result and track failure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const owner = context.repo.owner, repo = context.repo.repo;
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {owner, repo, run_id:run.id, per_page:100});
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {owner, repo, run_id:run.id, per_page:100});
+            const lines = ['## ' + run.name + ': ' + run.conclusion,
+              '[Open full run](' + run.html_url + ')',
+              '| Job | Result | Failing steps |', '|---|---|---|'];
+            for (const j of jobs) {
+              const bad = (j.steps||[]).filter(s => s.conclusion === 'failure').map(s => s.name).join(', ');
+              lines.push('| ' + j.name + ' | ' + j.conclusion + ' | ' + bad + ' |');
+            }
+            lines.push('### Artifacts');
+            for (const a of artifacts) lines.push('- [' + a.name + '](' + run.html_url + '/artifacts/' + a.id + '), ' + a.size_in_bytes + ' bytes, digest ' + (a.digest || 'unavailable'));
+            if (!artifacts.length) lines.push('None. This run produced no download.');
+            lines.push('Test counts and payload SHA256 are only authoritative when supplied by producing test and packaging jobs.');
+            await core.summary.addRaw(lines.join('\n')).write();
+            if (run.conclusion !== 'failure') return;
+            if (run.actor.login !== 'KL5NE' || !/^(feature|installer|test)\//.test(run.head_branch || '')) return;
+            const title = 'CI failure: ' + run.name + ' on ' + run.head_branch;
+            const all = await github.paginate(github.rest.issues.listForRepo,{owner,repo,state:'all',per_page:100});
+            const prior = all.find(i => !i.pull_request && i.title === title);
+            const count = prior ? Number(((prior.body||'').match(/autopilot-attempts:([0-9]+)/)||[])[1] || 0) : 0;
+            const failures = jobs.filter(j=>j.conclusion==='failure').map(j=>j.name+': '+(j.steps||[]).filter(s=>s.conclusion==='failure').map(s=>s.name).join(', '));
+            const body = 'Failure run: '+run.html_url+'\n\nFailed steps: '+failures.join('; ')+'\n\nLikely cause: consult first failed step logs.\n\nautopilot-attempts:'+count;
+            const issue = prior
+              ? (await github.rest.issues.update({owner,repo,issue_number:prior.number,state:'open',body})).data
+              : (await github.rest.issues.create({owner,repo,title,body})).data;
+            core.notice('Tracking issue #'+issue.number+'; repair requires key and separately approved workflow.');
