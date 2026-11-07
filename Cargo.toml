@@ -28,6 +28,8 @@ members = [
     "crates/tempo-stream",
     "crates/tempo-client",
     "crates/deepcw",
+    "crates/ahr-wwv-sys",
+    "crates/wwv",
 ]
 
 [workspace.package]

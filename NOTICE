@@ -463,6 +463,24 @@ GPL-compatible, so the vendored receiver redistributes cleanly inside the GPLv3
 whole. slowrx is an independent project, unmaintained upstream; Nexus is not
 affiliated with or endorsed by it.
 
+### AHR-Decoder — WWV/WWVH time code decoder (KL5NE, Alaska HamRadio)
+License: **GNU GPL, version 3 or (at your option) any later version**
+(SPDX `GPL-3.0-or-later`, per-file headers).
+<https://github.com/KL5NE/AHR-WWV-Decoder>
+
+The WWV Time feature decodes the 100 Hz time code broadcast by NIST's WWV
+(Fort Collins) and WWVH (Kauai) with **AHR-Decoder**, © 2026 KL5NE, Alaska
+HamRadio, and AHR-Decoder contributors. A subset of it is vendored at
+`crates/ahr-wwv-sys/vendor/ahr-decoder/`: the portable C++17 decoder core
+(`core/`), its plain C API (`capi/`), and, for tests only, the synthetic
+signal generator (`sim/`, `capi/testsynth/`, built only with the
+`ahr-wwv-sys/test-synth` feature and never shipped). `UPSTREAM_COMMIT` records
+the decoder commit it was taken from. Every vendored file carries its SPDX
+header and the full GPLv3 text is in `vendor/ahr-decoder/LICENSE`, which is
+why the `ahr-wwv-sys` manifest declares `license = "GPL-3.0-or-later"`. The
+"or later" grant is compatible with Nexus's GPL-3.0-only, so the combined
+work remains GPL-3.0-only. Nothing in it sets or steers a clock.
+
 ### Winlink secure-login algorithm — via wl2k-go (Martin Hebnes Pedersen, LA5NTA)
 License: **MIT**. <https://github.com/la5nta/wl2k-go>
 
