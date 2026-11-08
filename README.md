@@ -475,6 +475,9 @@ Nexus is **free software under the [GNU GPL v3](COPYING)** (GPL-3.0-only).
   by way of the MIT **[`slowrx.rs`](https://github.com/jasonherald/slowrx.rs)** Rust port by
   **Jason Herald**. Nexus's SSTV *receiver* (`crates/tempo-sstv/`) is vendored from it; the SSTV
   transmitter is original Nexus code (see **[NOTICE](NOTICE)**).
+- **[AHR-Decoder](https://github.com/KL5NE/AHR-WWV-Decoder)** (GPL-3.0-or-later) — **KL5NE**, Alaska
+  HamRadio. The WWV/WWVH time-code decoder behind the WWV Time feature, vendored at
+  `crates/ahr-wwv-sys/vendor/ahr-decoder/` (see **[NOTICE](NOTICE)**).
 - **[DeepCW](https://github.com/e04/deepcw-engine)** (AGPL-3.0) — **e04**. The neural-network model
   behind Nexus's primary CW decoder, shipped as an app resource (`resources/deepcw/`) with its full
   AGPL-3.0 license text bundled in the installer; its corresponding source is the upstream

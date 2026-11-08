@@ -1,0 +1,19 @@
+[package]
+publish = false
+name = "wwv"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Safe wrapper over AHR-Decoder: WWV/WWVH time code from receiver audio (RX only, never touches a clock)"
+
+[lints]
+workspace = true
+
+[dependencies]
+ahr-wwv-sys = { path = "../ahr-wwv-sys" }
+
+[dev-dependencies]
+# Turns on the TEST-ONLY synthetic rig audio for `cargo test -p wwv`, without
+# shipping it in production builds (resolver 2 keeps dev features out of them).
+ahr-wwv-sys = { path = "../ahr-wwv-sys", features = ["test-synth"] }

@@ -1,9 +1,13 @@
 name: WWV Phase 0 baseline (unmodified Nexus)
 on:
   push:
-    branches: [feature/wwv-time-tab]
+    branches: [feature/wwv-time-tab, 'feature/wwv-c1-native-abi-*']
     paths:
       - 'docs/wwv/**'
+      - 'crates/ahr-wwv-sys/**'
+      - 'crates/wwv/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
       - '.github/workflows/wwv-phase0-baseline.yml'
       - 'crates/tempo-fast-sys/build.rs'
   workflow_dispatch:

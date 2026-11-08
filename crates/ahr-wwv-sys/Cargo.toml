@@ -1,0 +1,21 @@
+[package]
+publish = false
+name = "ahr-wwv-sys"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+# GPL-3.0-or-later, not the workspace GPL-3.0-only: the vendored AHR-Decoder
+# carries its own per-file "or later" grant (see vendor/ahr-decoder and NOTICE).
+# It is GPL-3.0-only compatible, so the combined Nexus work remains GPL-3.0-only.
+license = "GPL-3.0-or-later"
+description = "Raw FFI bindings to the vendored AHR-Decoder (WWV/WWVH time code) plain C API"
+links = "ahrwwv"
+build = "build.rs"
+
+[lints]
+workspace = true
+
+[features]
+# TEST ONLY: the synthetic rig-audio generator (WWV received in USB by a rig).
+# Enabled by the `wwv` crate's dev-dependency; never in a shipped build.
+test-synth = []
