@@ -48,6 +48,7 @@ impl Drop for Synth {
 struct Run {
     verified_after_s: Option<f64>,
     wrong_utc_polls: u32,
+    untrusted_time_polls: u32,
     last: wwv::Status,
 }
 
@@ -70,6 +71,7 @@ fn run(rate: f64, carrier_tone: f64, snr: f64, fading: f64, pc_error_s: f64, sec
     let mut out = Run {
         verified_after_s: None,
         wrong_utc_polls: 0,
+        untrusted_time_polls: 0,
         last: d.status(),
     };
     while (done as f64) < seconds * rate {
@@ -81,6 +83,13 @@ fn run(rate: f64, carrier_tone: f64, snr: f64, fading: f64, pc_error_s: f64, sec
         d.push_unix(&buf, t_capture + pc_error_s).expect("push");
         done += block;
         let s = d.status();
+        // A candidate frame must never expose a trusted UTC or a clock offset.
+        // This is a safety contract for future Nexus clock integrations.
+        if !matches!(s.state, State::Verified | State::Holdover)
+            && (s.utc.is_some() || s.clock_offset.is_some())
+        {
+            out.untrusted_time_polls += 1;
+        }
         let t_tx_now = start + done as f64 / rate - synth.path_delay();
         if let Some((utc, _)) = s.utc {
             if (utc - t_tx_now).abs() > 0.5 {
@@ -105,6 +114,7 @@ fn verified_time_and_pc_offset_from_rig_audio() {
         r.verified_after_s
     );
     assert_eq!(r.wrong_utc_polls, 0);
+    assert_eq!(r.untrusted_time_polls, 0);
     assert_eq!(s.station, Station::Wwv);
     let m = s.minute.expect("trusted minute");
     assert_eq!((m.year, m.day_of_year), (2026, 310));
@@ -124,6 +134,7 @@ fn rig_off_tune_and_slow_pc_clock_at_44k1() {
         r.last.state
     );
     assert_eq!(r.wrong_utc_polls, 0);
+    assert_eq!(r.untrusted_time_polls, 0);
     let off = r.last.clock_offset.expect("clock offset");
     assert!((off.seconds + 1.700).abs() < 0.002, "offset {off:?}");
 }
@@ -132,6 +143,7 @@ fn rig_off_tune_and_slow_pc_clock_at_44k1() {
 fn deep_fading_never_shows_a_wrong_time() {
     let r = run(48_000.0, 1475.0, 15.0, 0.95, 0.080, 600.0);
     assert_eq!(r.wrong_utc_polls, 0);
+    assert_eq!(r.untrusted_time_polls, 0);
     // Positive control: the run must have got far enough for a wrong time to
     // be possible at all, or "no wrong time" proves nothing.
     assert!(
