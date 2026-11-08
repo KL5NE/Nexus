@@ -1,0 +1,57 @@
+name: Nexus C1 AHR-Decoder native ABI (no clock control)
+on:
+  push:
+    branches: ['feature/wwv-c1-native-abi-*']
+    paths: ['crates/ahr-wwv-sys/**', 'crates/wwv/**', '.github/workflows/wwv-c1.yml', 'Cargo.toml', 'Cargo.lock']
+  pull_request:
+    paths: ['crates/ahr-wwv-sys/**', 'crates/wwv/**', '.github/workflows/wwv-c1.yml', 'Cargo.toml', 'Cargo.lock']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pinned-linux:
+    name: Pinned Rust 1.93.1 / Linux C1 tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Provision CMake, C++17 and build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++ pkg-config
+      - name: Install pinned Nexus Rust 1.93.1
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.93.1'
+          components: clippy,rustfmt
+      - name: Check workspace formatting
+        run: cargo fmt --all -- --check
+      - name: C1 safe decoder regression
+        run: cargo test --locked -p ahr-wwv-sys -p wwv
+      - name: C1 clippy
+        run: cargo clippy --locked -p ahr-wwv-sys -p wwv --all-targets -- -D warnings
+      - name: Inspect project-defined gates and unrunnable gates
+        if: always()
+        shell: bash
+        run: |
+          node scripts/gates --list || true
+          node scripts/gates --list --unrunnable || true
+          echo "This reports discovered gates; it is NOT a full scripts/gates success claim."
+  windows-gnu:
+    name: Supported Windows GNU cross-build plus C1 library
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+      - name: Provision supported MinGW modem cross environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 gfortran-mingw-w64-x86-64 cmake ninja-build nasm pkg-config libboost-dev
+      - name: Provision Rust Windows GNU target
+        run: rustup target add x86_64-pc-windows-gnu
+      - name: Existing supported Windows modem cross-build (baseline)
+        run: bash scripts/build-windows-cross.sh --modem
+      - name: Compile C1 native decoder and safe wrapper for Windows GNU
+        env:
+          CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: x86_64-w64-mingw32-gcc
+        run: cargo check --locked --target x86_64-pc-windows-gnu -p ahr-wwv-sys -p wwv
