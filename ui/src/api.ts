@@ -124,6 +124,8 @@ declare global {
           handler: (e: { payload: T }) => void,
           options?: { target?: string | { kind: string; label?: string } },
         ) => Promise<() => void>
+        /** Send an event to the backend (`features/automationBridge.ts`: the automation bridge). */
+        emit?: (event: string, payload?: unknown) => Promise<void>
       }
     }
     /**

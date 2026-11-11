@@ -41,6 +41,9 @@ mod aprs_iss_doppler;
 /// `get_arrival_outlook`: NOAA's watch, forecast days, model run and L1 wind, each kept and
 /// backed off on its own.
 mod arrival_outlook;
+/// The automation bridge: Nexus's own commands, by name, for one program on this computer (KL5NE's
+/// Claude connector), admitted by the class table. Off until `automation-bridge.json` turns it on.
+mod automation_bridge;
 /// Test builds only (the `bench-road-switch` feature): the switch on a computer driving a station
 /// that blocks its command link or its Stop road, one at a time, so each road can be tried alone.
 #[cfg(feature = "bench-road-switch")]
@@ -50794,6 +50797,37 @@ fn finish_launch(handle: tauri::AppHandle, d: BuildDeps, rest: LaunchRest) {
         handle.state::<remote_monitor::Publisher>().inner().clone(),
         &handle,
     ));
+    // The automation bridge for a program on this computer (KL5NE's Claude connector): one manager
+    // thread that reads `automation-bridge.json` beside settings.json and hot-applies it. Off until
+    // that file turns it on; loopback only, token, class-gated. See automation_bridge.rs.
+    // A computer driving a station (client mode) runs none: its commands are the shack's.
+    if client_mode::requested().is_none() {
+        let window = handle.clone();
+        let emit: automation_bridge::Emit =
+            Arc::new(move |name: &'static str, payload: serde_json::Value| {
+                use tauri::Emitter;
+                let _ = window.emit_to("main", name, payload);
+            });
+        automation_bridge::spawn(
+            command_dispatch::tauri_runner(handle.clone()),
+            config_dir(),
+            |lane, level, message| conn_log(lane, level, message),
+            Some(emit),
+        );
+        use tauri::Listener;
+        // The main window's half (its screen, its hello, the Settings switch)…
+        for &name in automation_bridge::UI_EVENTS {
+            handle.listen_any(name, move |event| {
+                automation_bridge::ui_event(name, event.payload())
+            });
+        }
+        // …and Nexus's alerts, kept for a connected program to read.
+        for &name in command_dispatch::FORWARDED_EVENTS {
+            handle.listen_any(name, move |event| {
+                automation_bridge::alert(name, event.payload())
+            });
+        }
+    }
     // Pounce detector. Raises an alert to every window when a rare one appears — the
     // app's ONLY push; everything else polls. `emit` (not `emit_to`) so the pop-out
     // panel windows get it too without tracking listener lifetimes. The alert is made
