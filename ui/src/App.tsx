@@ -252,6 +252,8 @@ import { OnboardingBanner } from './components/OnboardingBanner'
 import { PounceBanner } from './components/PounceBanner'
 import { UpdateBanner } from './components/UpdateBanner'
 import { ClientBanner } from './components/ClientBanner'
+import { AutomationBanner } from './components/AutomationBanner'
+import { useAutomationNavigation } from './features/automationBridge'
 import { KeyConfirmBanner } from './components/KeyConfirmBanner'
 import { useSelfUpdate } from './useSelfUpdate'
 import { usePounce, type PounceAlert } from './usePounce'
@@ -2835,6 +2837,11 @@ function App() {
     [],
   )
 
+  // ⭐ THE AUTOMATION BRIDGE (features/automationBridge.ts): a program on this computer asks for a screen
+  // and the window makes the rail's own switch (`handleView`), or opens Settings at a place; and each
+  // screen change is told back, so the program knows where the operator is looking.
+  useAutomationNavigation(view, handleView, openSettingsAt)
+
   // When Nexus switches radio by itself and the station asked to be told: one line with Undo
   // (the operator's own radio pick, back to the radio it left) and Why? (the routing rules).
   useRadioSwitchNotice({
@@ -4234,6 +4241,7 @@ function App() {
   return (
     <div className="app">
       <ClientBanner />
+      <AutomationBanner />
       <KeyConfirmBanner />
       {/* The window's one station card: a call clicked anywhere on screen opens it (CallCard.tsx). */}
       <CallCardHost snap={snap} spots={allSpots} needAlertsByCall={needAlertsByCall} />

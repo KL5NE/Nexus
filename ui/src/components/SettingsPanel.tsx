@@ -241,6 +241,7 @@ import { fetchFdRules, getFdRulesStatus, type FdRulesStatus } from '../api'
 import { getFdRuleset, previewFdRuleset, type FdRulesetDto } from '../api'
 import { locationWarningText } from '../features/contestLocation'
 import { fetchTlesNow, getTleStatus, importTles, type TleStatus } from '../api'
+import { AutomationBridgeSettings } from './AutomationBridgeSettings'
 import { tleRefreshMessage } from '../features/tleMessages'
 import { elementBandParts } from '../features/elementBands'
 import { discoverFlex } from '../api'
@@ -12920,6 +12921,8 @@ export function SettingsPanel({
                   {setAtStation('wsjtxUdpAcceptOtherComputers')}
                   <span className="settings-hint">{t('settings.integrations.wsjtxUdpAccept.hint')}</span>
                 </div>
+
+                <AutomationBridgeSettings away={(form.stationOnlySettings?.length ?? 0) > 0} />
 
                 <div className="settings-field">
                   <label className="settings-toggle">
